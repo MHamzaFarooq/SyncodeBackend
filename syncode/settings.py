@@ -153,7 +153,7 @@ CORS_ALLOWED_ORIGINS = [
 
 CSRF_TRUSTED_ORIGINS = [
    "http://localhost:3000",  # Allow frontend running on localhost
-   "https://yourfrontenddomain.com",  # Add your deployed frontend domain
+   "https://syncode-nu.vercel.app",  # Add your deployed frontend domain
 ]
 
 
