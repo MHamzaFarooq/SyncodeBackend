@@ -1,1 +1,1 @@
-web: gunicorn syncode_backend.wsgi
+web: gunicorn syncode.wsgi
