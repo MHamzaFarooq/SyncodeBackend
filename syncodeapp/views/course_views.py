@@ -20,7 +20,7 @@ def get_teacher_name(teacher_id):
 def create_course(request):
     try:
         data = json.loads(request.body)
-        required_fields = ['teacher_id', 'title', 'description', 'hours', 'programming_language', 'level', 'status']
+        required_fields = ['teacher_id', 'title', 'description', 'programming_language', 'level', 'status']
 
         for field in required_fields:
             if not data.get(field):
@@ -36,7 +36,6 @@ def create_course(request):
             'teacher_id': data['teacher_id'],
             'title': data['title'],
             'description': data['description'],
-            'hours': data['hours'],
             'programming_language': data['programming_language'],
             'level': data['level'],
             'status': data['status']
@@ -187,3 +186,79 @@ def get_teacher_courses(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+    
+
+@csrf_exempt
+@require_GET
+def get_teacher_courses_and_vids(request):
+    try:
+        teacher_id = request.GET.get('teacher_id')
+
+        if not teacher_id:
+            return JsonResponse({'error': 'Missing teacher_id parameter'}, status=400)
+
+        courses_ref = db.collection('Courses').where('teacher_id', '==', teacher_id)
+        courses = []
+
+        for doc in courses_ref.stream():
+            course_data = doc.to_dict()
+            course_id = course_data.get('course_id')
+
+            # Add teacher name
+            teacher_name = get_teacher_name(teacher_id)
+            course_data['teacher_name'] = teacher_name
+
+            # Fetch related videos with only selected fields
+            videos_query = db.collection('Videos').where('course_id', '==', course_id)
+            videos = []
+            for video_doc in videos_query.stream():
+                video_data = video_doc.to_dict()
+
+                # Pick only specific fields
+                filtered_video = {
+                    'video_id': video_data.get('video_id'),
+                    'name': video_data.get('name'),
+                    'uploaded_at': video_data.get('uploaded_at'),
+                }
+
+                videos.append(filtered_video)
+
+            # Attach videos list to the course
+            course_data['videos'] = videos
+
+            courses.append(course_data)
+
+        return JsonResponse({'courses': courses}, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_POST
+def delete_course(request):
+    try:
+        data = json.loads(request.body)
+        course_id = data.get('course_id')
+
+        if not course_id:
+            return JsonResponse({'error':'Missing course_id parameter'}, status=400)
+        
+        # Reference to the course document
+        course_ref = db.collection('Courses').document(course_id)
+        course_doc = course_ref.get()
+
+        if not course_doc.exists:
+            return JsonResponse({'error':'Course not found'}, status=404)
+        
+        # Delete associated videos
+        videos_query = db.collection('Videos').where('course_id','==',course_id)
+        for video_doc in videos_query.stream():
+            video_doc.reference.delete()
+
+        # Delete the course
+        course_ref.delete()
+
+        return JsonResponse({'message':f'Course {course_id} and its videos deleted successfully'}, status=200)
+    except Exception as e:
+        return JsonResponse({'error':str(e)}, status=500)

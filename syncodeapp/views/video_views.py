@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime
 from syncode.firebase import db
 from decouple import config
-
+import json
 
 # Configuration       
 cloudinary.config( 
@@ -76,6 +76,44 @@ def get_video(request):
 
         video_data = video_doc.to_dict()
         return JsonResponse({'video': video_data}, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+
+@csrf_exempt
+@require_POST
+def delete_video(request):
+    try:
+        data = json.loads(request.body)
+        video_id = data.get('video_id')
+
+        if not video_id:
+            return JsonResponse({'error': 'Missing video_id parameter'}, status=400)
+
+        # Fetch the video document
+        video_ref = db.collection('Videos').document(video_id)
+        video_doc = video_ref.get()
+
+        if not video_doc.exists:
+            return JsonResponse({'error': 'Video not found'}, status=404)
+
+        video_data = video_doc.to_dict()
+        audio_url = video_data.get('audio_url')
+
+        # Extract public_id from Cloudinary URL
+        if audio_url:
+            # Cloudinary URL format: https://res.cloudinary.com/<cloud_name>/video/upload/v<timestamp>/<public_id>.<ext>
+            public_id = audio_url.split('/')[-1].split('.')[0]
+            try:
+                cloudinary.uploader.destroy(public_id, resource_type="video")
+            except Exception as cloud_err:
+                return JsonResponse({'error': f'Failed to delete from Cloudinary: {cloud_err}'}, status=500)
+
+        # Delete video document from Firestore
+        video_ref.delete()
+
+        return JsonResponse({'message': 'Video deleted successfully'}, status=200)
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

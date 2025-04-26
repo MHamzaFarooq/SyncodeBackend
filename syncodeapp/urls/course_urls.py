@@ -5,7 +5,9 @@ from syncodeapp.views.course_views import (
     get_available_courses,
     get_upcoming_courses,
     get_course_by_id,
-    get_teacher_courses
+    get_teacher_courses,
+    get_teacher_courses_and_vids,
+    delete_course
 )
 
 urlpatterns = [
@@ -14,5 +16,7 @@ urlpatterns = [
     path('get-available/',get_available_courses,name='get-available-courses'),
     path('get-upcoming/',get_upcoming_courses,name='get-upcoming-courses'),
     path('get-course-by-id',get_course_by_id,name='get-course-by-id'),
-     path('get-teacher-courses',get_teacher_courses,name='get-teacher-courses'),
+    path('get-teacher-courses',get_teacher_courses,name='get-teacher-courses'),
+    path('get-teacher-courses-and-vids',get_teacher_courses_and_vids,name='get-teacher-courses-and-vids'),
+    path('delete-course',delete_course,name='delete-course'),
 ]

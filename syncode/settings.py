@@ -28,7 +28,8 @@ SECRET_KEY = "django-insecure-x!@0z&x!*ne$h6#+y_p+kl!yvf!5e2jt(#cju49mvbk2u(!9z%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['.onrender.com']
+
 
 CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME')
 CLOUDINARY_API_KEY = config('CLOUDINARY_API_KEY')
