@@ -122,6 +122,44 @@ def get_upcoming_courses(request):
         return JsonResponse({'error':str(e)},status=500)
 
 
+# @csrf_exempt
+# @require_GET
+# def get_course_by_id(request):
+#     try:
+#         course_id = request.GET.get('course_id')
+
+#         if not course_id:
+#             return JsonResponse({'error': 'Missing course_id parameter'}, status=400)
+
+#         # Get the course
+#         course_ref = db.collection('Courses').document(course_id)
+#         course_doc = course_ref.get()
+
+#         if not course_doc.exists:
+#             return JsonResponse({'error': 'Course not found'}, status=404)
+
+#         course_data = course_doc.to_dict()
+
+#         # Add teacher name
+#         teacher_id = course_data.get('teacher_id')
+#         course_data['teacher_name'] = get_teacher_name(teacher_id) if teacher_id else 'Unknown'
+
+#         # Get videos related to the course
+#         videos_ref = db.collection('Videos').where('course_id', '==', course_id)
+#         videos = [video_doc.to_dict() for video_doc in videos_ref.stream()]
+        
+#         # Sort videos by uploaded_at timestamp in descending order (newest first)
+#         # Handle cases where uploaded_at might be empty for some videos
+#         videos.sort(key=lambda x: x.get('uploaded_at', ''), reverse=False)
+
+#         # Add sorted videos to the course data
+#         course_data['videos'] = videos
+
+#         return JsonResponse({'course': course_data}, status=200)
+
+#     except Exception as e:
+#         return JsonResponse({'error': str(e)}, status=500)
+
 @csrf_exempt
 @require_GET
 def get_course_by_id(request):
@@ -148,17 +186,24 @@ def get_course_by_id(request):
         videos_ref = db.collection('Videos').where('course_id', '==', course_id)
         videos = [video_doc.to_dict() for video_doc in videos_ref.stream()]
         
-        # Sort videos by uploaded_at timestamp in descending order (newest first)
-        # Handle cases where uploaded_at might be empty for some videos
+        # Sort videos by uploaded_at timestamp in ascending order (oldest first)
         videos.sort(key=lambda x: x.get('uploaded_at', ''), reverse=False)
-
+        
         # Add sorted videos to the course data
         course_data['videos'] = videos
+
+        # Get assignments related to the course
+        assignments_ref = db.collection('Assignments').where('course_id', '==', course_id)
+        assignments = [assignment_doc.to_dict() for assignment_doc in assignments_ref.stream()]
+
+        # Add assignments to the course data
+        course_data['assignments'] = assignments
 
         return JsonResponse({'course': course_data}, status=200)
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 
 @csrf_exempt
 @require_GET

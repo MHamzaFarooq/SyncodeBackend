@@ -25,4 +25,5 @@ urlpatterns = [
     path('teacher/', include('syncodeapp.urls.teacher_urls')),
     path('course/', include('syncodeapp.urls.course_urls')),
     path('video/', include('syncodeapp.urls.video_urls')),
+    path('assignment/', include('syncodeapp.urls.assignment_urls')),
 ]
