@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 import json
 from syncode.firebase import db
 from syncodeapp.utils.hashing import hash_password, verify_password
@@ -124,3 +124,58 @@ def logout_student(request):
     
     except Exception as e:
         return JsonResponse({'error':str(e)},status=500)
+    
+
+# @csrf_exempt
+@require_GET
+def get_student_submissions(request):
+    try:
+        student_id = request.GET.get('student_id')
+        if not student_id:
+            return JsonResponse({'error': 'Missing student_id'}, status=400)
+
+        submissions_query = db.collection('Submissions').where('student_id', '==', student_id)
+        submissions = [doc.to_dict() for doc in submissions_query.stream()]
+
+        return JsonResponse({'submissions': submissions}, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_GET
+def get_student_feedback_submissions(request):
+    try:
+        student_id = request.GET.get('student_id')
+        if not student_id:
+            return JsonResponse({'error': 'Missing student_id'}, status=400)
+
+        # Step 1: Get all submissions by the student
+        submissions = db.collection('Submissions').where('student_id', '==', student_id).stream()
+        
+        feedback_submissions = []
+        for sub in submissions:
+            sub_data = sub.to_dict()
+            feedback = sub_data.get('feedback', '').strip()
+
+            # Step 2: Check if feedback is not empty
+            if feedback:
+                sub_data['submission_id'] = sub.id
+
+                # Optional: Add assignment name for context
+                assignment_id = sub_data.get('assignment_id')
+                if assignment_id:
+                    assignment_ref = db.collection('Assignments').document(assignment_id).get()
+                    if assignment_ref.exists:
+                        sub_data['assignment_name'] = assignment_ref.to_dict().get('name', '')
+                    else:
+                        sub_data['assignment_name'] = ''
+                else:
+                    sub_data['assignment_name'] = ''
+
+                feedback_submissions.append(sub_data)
+
+        return JsonResponse({'submissions': feedback_submissions}, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

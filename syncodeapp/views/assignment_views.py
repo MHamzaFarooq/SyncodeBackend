@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
 import json
-from syncode.firebase import db
+from syncode.firebase import db, firestore
 
 @csrf_exempt
 @require_POST
@@ -68,3 +68,64 @@ def get_assignments_by_course(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_POST
+def submit_assignment(request):
+    try:
+        data = json.loads(request.body)
+        assignment_id = data.get('assignment_id')
+        student_id = data.get('student_id')
+        code = data.get('code') 
+
+        if not all([assignment_id, student_id, code]):
+            return JsonResponse({'error': 'Missing required fields.'}, status=400)
+
+        # Check if submission already exists
+        submissions_ref = db.collection('Submissions')
+        existing_query = submissions_ref \
+            .where('assignment_id', '==', assignment_id) \
+            .where('student_id', '==', student_id) \
+            .limit(1) \
+            .stream()
+
+        if any(existing_query):
+            return JsonResponse({'error': 'Assignment already submitted by this student.'}, status=409)
+
+        # Proceed to save submission
+        submission_ref = submissions_ref.document()
+        submission_data = {
+            'submission_id': submission_ref.id,
+            'assignment_id': assignment_id,
+            'student_id': student_id,
+            'code': code,
+            'submitted_at': firestore.SERVER_TIMESTAMP,
+            'feedback': '',  # Initially empty
+        }
+
+        submission_ref.set(submission_data)
+        return JsonResponse({'message': 'Assignment submitted successfully.'}, status=201)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_GET
+def get_assignment_status(request):
+    try:
+        assignment_id = request.GET.get('assignment_id')
+        student_id = request.GET.get('student_id')
+
+        # Query the top-level Submissions collection
+        submissions = db.collection('Submissions')\
+            .where('assignment_id', '==', assignment_id)\
+            .where('student_id', '==', student_id)\
+            .limit(1).get()
+
+        is_submitted = len(submissions) > 0
+
+        return JsonResponse({'submitted': is_submitted}, status=200)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
