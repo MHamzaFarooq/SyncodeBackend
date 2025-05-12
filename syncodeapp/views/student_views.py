@@ -3,6 +3,9 @@ from django.views.decorators.http import require_POST, require_GET
 import json
 from syncode.firebase import db
 from syncodeapp.utils.hashing import hash_password, verify_password
+from syncodeapp.utils.email_utils import generate_otp, send_otp_email
+from django.core.cache import cache
+
 
 @require_POST
 def create_student(request):
@@ -179,3 +182,71 @@ def get_student_feedback_submissions(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_POST
+def pre_register_student(request):
+    data = json.loads(request.body)
+    required_fields = ['enroll','email','username','password']
+    
+    for field in required_fields:
+        if not data.get(field):
+            return JsonResponse({"error":f"Missing required field: {field}"}, status=400)
+    
+    email = data['email']
+
+    # Check if email/enroll already exists
+    students_ref = db.collection('Students')
+    if any(students_ref.where('email','==',email).stream()):
+        return JsonResponse({'error':'Email already exists'}, status=400)
+    if any(students_ref.where('enroll','==',data['enroll']).stream()):
+        return JsonResponse({'error':'Enrollment number already exists'}, status=400)
+
+    # Send OTP
+    otp = generate_otp()
+    cache.set(f'otp_{email}', otp, timeout=600)  # 10 minutes
+    send_otp_email(email, otp)
+
+    # Temporarily store user data in cache
+    cache.set(f'reg_pending_{email}', {
+        'enroll': data['enroll'],
+        'username': data['username'],
+        'password': hash_password(data['password']).decode('utf-8')
+    }, timeout=600)
+
+    return JsonResponse({'message': 'OTP sent to email', 'email': email}, status=200)
+
+
+@require_POST
+def pre_login_student(request):
+    data = json.loads(request.body)
+    email = data.get('email')
+    password = data.get('password')
+
+    if not email or not password:
+        return JsonResponse({'error': 'Email and password are required'}, status=400)
+
+    students_ref = db.collection('Students').where('email','==',email).stream()
+    student = next(students_ref, None)
+    if not student:
+        return JsonResponse({'error': 'Invalid email or password'}, status=401)
+    
+    student_data = student.to_dict()
+    if not verify_password(password, student_data['password']):
+        return JsonResponse({'error': 'Invalid email or password'}, status=401)
+
+    # Send OTP
+    otp = generate_otp()
+    cache.set(f'otp_{email}', otp, timeout=600)
+    send_otp_email(email, otp)
+
+    # Store minimal session data to validate later
+    cache.set(f'login_pending_{email}', {
+        'student_id': student_data['student_id'],
+        'enroll': student_data['enroll'],
+        'email': student_data['email'],
+        'username': student_data['username']
+    }, timeout=600)
+
+    return JsonResponse({'message': 'OTP sent to email', 'email': email}, status=200)
+
